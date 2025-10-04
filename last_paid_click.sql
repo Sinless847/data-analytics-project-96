@@ -1,4 +1,3 @@
---last_paid_click.csv
 WITH last_paid_click AS (
     SELECT
         s.visitor_id,
