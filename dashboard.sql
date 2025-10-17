@@ -143,51 +143,104 @@ INNER JOIN cost_data AS c ON r.source = c.source
 ORDER BY r.source;
 
 --расчет ключевых метрик
-WITH metrics_data AS (
+WITH ranked_clicks AS (
     SELECT
-        s.source,
-        COUNT(DISTINCT s.visitor_id) AS visitors_count,
-        COUNT(DISTINCT l.lead_id) AS leads_count,
-        COUNT(DISTINCT CASE WHEN l.status_id = 142 THEN l.lead_id END)
-            AS purchases_count,
-        COALESCE(SUM(CASE WHEN l.status_id = 142 THEN l.amount ELSE 0 END), 0)
-            AS revenue,
-        (
-            CASE
-                WHEN s.source = 'yandex'
-                    THEN (
-                        SELECT SUM(ya.daily_spent)
-                        FROM ya_ads AS ya
-                        WHERE
-                            ya.campaign_date BETWEEN '2023-06-01'
-                            AND '2023-07-01'
-                    )
-                WHEN s.source = 'vk' THEN (
-                    SELECT SUM(vk.daily_spent)
-                    FROM vk_ads AS vk
-                    WHERE vk.campaign_date BETWEEN '2023-06-01' AND '2023-07-01'
-                )
-            END
-        ) AS total_cost
+        s.visitor_id,
+        s.visit_date,
+        s.source AS utm_source,
+        s.medium AS utm_medium,
+        s.campaign AS utm_campaign,
+        l.lead_id,
+        l.amount,
+        l.closing_reason,
+        l.status_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY s.visitor_id
+            ORDER BY s.visit_date DESC
+        ) AS rn
     FROM sessions AS s
-    LEFT JOIN leads AS l
-        ON s.visitor_id = l.visitor_id
-    WHERE
-        s.visit_date BETWEEN '2023-06-01' AND '2023-07-01'
-        AND s.source IN ('yandex', 'vk')
-    GROUP BY s.source
+    LEFT JOIN
+        leads AS l
+        ON s.visitor_id = l.visitor_id AND s.visit_date <= l.created_at
+    WHERE s.medium != 'organic'
+),
+
+spendings AS (
+    SELECT
+        DATE(campaign_date) AS campaign_date,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        SUM(daily_spent) AS total_cost
+    FROM vk_ads
+    GROUP BY 1, 2, 3, 4
+    UNION DISTINCT
+    SELECT
+        DATE(campaign_date) AS campaign_date,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        SUM(daily_spent) AS total_cost
+    FROM ya_ads
+    GROUP BY 1, 2, 3, 4
+),
+
+agg_tab AS (
+    SELECT
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        DATE(visit_date) AS visit_date,
+        COUNT(visitor_id) AS visitors_count,
+        COUNT(lead_id) AS leads_count,
+        COUNT(lead_id) FILTER (
+            WHERE status_id = 142
+        ) AS purchases_count,
+        SUM(amount) AS revenue
+    FROM ranked_clicks
+    WHERE rn = 1
+    GROUP BY 1, 2, 3, 4
+    ORDER BY
+        8 DESC NULLS LAST, 4, 5 DESC, 1 ASC, 2 ASC, 3 ASC
+),
+
+tabs AS (
+    SELECT
+        agg_tab.visit_date,
+        agg_tab.utm_source,
+        agg_tab.utm_medium,
+        agg_tab.utm_campaign,
+        agg_tab.visitors_count,
+        sp.total_cost,
+        agg_tab.leads_count,
+        agg_tab.purchases_count,
+        agg_tab.revenue
+    FROM agg_tab
+    INNER JOIN spendings AS sp
+        ON
+            agg_tab.utm_source = sp.utm_source
+            AND agg_tab.utm_medium = sp.utm_medium
+            AND agg_tab.utm_campaign = sp.utm_campaign
+            AND agg_tab.visit_date = sp.campaign_date
+    ORDER BY 9 DESC NULLS LAST, 1, 5 DESC, 2, 3, 4
 )
 
 SELECT
-    source AS channel,
-    -- CPU
-    ROUND(total_cost / NULLIF(visitors_count, 0), 2) AS cpu,
-    -- CPL
-    ROUND(total_cost / NULLIF(leads_count, 0), 2) AS cpl,
-    -- CPPU
-    ROUND(total_cost / NULLIF(purchases_count, 0), 2) AS cppu,
-    -- ROI
-    ROUND((revenue - total_cost) * 100.0 / NULLIF(total_cost, 0), 2)
-        AS roi_percent
-FROM metrics_data
-ORDER BY source;
+    utm_source,
+    CASE
+        WHEN SUM(visitors_count) = 0 THEN 0
+        ELSE ROUND(SUM(total_cost) / SUM(visitors_count), 2)
+    END AS cpu,
+    CASE
+        WHEN SUM(leads_count) = 0 THEN 0
+        ELSE ROUND(SUM(total_cost) / SUM(leads_count), 2)
+    END AS cpl,
+    CASE
+        WHEN SUM(purchases_count) = 0 THEN 0
+        ELSE ROUND(SUM(total_cost) / SUM(purchases_count), 2)
+    END AS cppu,
+    ROUND(
+        100.0 * (SUM(revenue) - SUM(total_cost)) / SUM(total_cost), 2
+    ) AS roi
+FROM tabs
+GROUP BY 1;
