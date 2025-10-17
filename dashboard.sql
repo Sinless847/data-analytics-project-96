@@ -66,19 +66,19 @@ SELECT
 FROM (
     SELECT
         campaign_date AS period,
-        'yandex' AS source,
+        utm_source AS source,
         SUM(daily_spent) AS total_spent
     FROM ya_ads
-    GROUP BY campaign_date
+    GROUP BY campaign_date, utm_source
 
     UNION ALL
 
     SELECT
         campaign_date AS period,
-        'vk' AS source,
+        utm_source AS source,
         SUM(daily_spent) AS total_spent
     FROM vk_ads
-    GROUP BY campaign_date
+    GROUP BY campaign_date, utm_source
 ) AS combined_data
 ORDER BY period, source;
 
