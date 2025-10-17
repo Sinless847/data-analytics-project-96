@@ -5,7 +5,6 @@ SELECT
     COUNT(DISTINCT visitor_id) AS unique_visitors,
     COUNT(*) AS total_sessions
 FROM sessions
-WHERE visit_date BETWEEN '2023-06-01' AND '2023-07-01'
 GROUP BY DATE_TRUNC('day', visit_date)
 ORDER BY period;
 
@@ -17,8 +16,7 @@ SELECT
     COUNT(*) AS sessions
 FROM sessions
 WHERE
-    visit_date BETWEEN '2023-06-01' AND '2023-07-01'
-    AND source IN ('google', 'organic', 'vk', 'yandex')
+    source IN ('google', 'organic', 'vk', 'yandex')
 GROUP BY
     DATE(visit_date),
     source
@@ -31,8 +29,7 @@ SELECT
 FROM sessions AS s
 INNER JOIN leads AS l ON s.visitor_id = l.visitor_id
 WHERE
-    l.created_at BETWEEN '2023-06-01' AND '2023-07-01'
-    AND s.source IN ('google', 'organic', 'vk', 'yandex')
+    s.source IN ('google', 'organic', 'vk', 'yandex')
 GROUP BY DATE(l.created_at), s.source
 ORDER BY period ASC, leads_count DESC;
 
@@ -43,8 +40,7 @@ SELECT
 FROM sessions AS s
 INNER JOIN leads AS l ON s.visitor_id = l.visitor_id
 WHERE
-    l.created_at BETWEEN '2023-06-01' AND '2023-07-01'
-    AND s.source IN ('google', 'organic', 'vk', 'yandex')
+    s.source IN ('google', 'organic', 'vk', 'yandex')
 GROUP BY s.source
 ORDER BY leads_count DESC;
 
@@ -62,7 +58,6 @@ SELECT
     END AS day_of_week,
     COUNT(DISTINCT visitor_id) AS unique_visitors
 FROM sessions
-WHERE visit_date BETWEEN '2023-06-01' AND '2023-07-01'
 GROUP BY
     EXTRACT(ISODOW FROM visit_date),
     source
@@ -81,7 +76,6 @@ FROM (
         'yandex' AS source,
         SUM(daily_spent) AS total_spent
     FROM ya_ads
-    WHERE campaign_date BETWEEN '2023-06-01' AND '2023-07-01'
     GROUP BY campaign_date
 
     UNION ALL
@@ -91,7 +85,6 @@ FROM (
         'vk' AS source,
         SUM(daily_spent) AS total_spent
     FROM vk_ads
-    WHERE campaign_date BETWEEN '2023-06-01' AND '2023-07-01'
     GROUP BY campaign_date
 ) AS combined_data
 ORDER BY period, source;
@@ -105,8 +98,7 @@ WITH revenue_data AS (
     FROM sessions AS s
     LEFT JOIN leads AS l ON s.visitor_id = l.visitor_id
     WHERE
-        s.visit_date BETWEEN '2023-06-01' AND '2023-07-01'
-        AND s.source IN ('yandex', 'vk')
+        s.source IN ('yandex', 'vk')
     GROUP BY s.source
 ),
 
@@ -115,7 +107,6 @@ cost_data AS (
         'yandex' AS source,
         SUM(daily_spent) AS consumption
     FROM ya_ads
-    WHERE campaign_date BETWEEN '2023-06-01' AND '2023-07-01'
 
     UNION ALL
 
@@ -123,7 +114,6 @@ cost_data AS (
         'vk' AS source,
         SUM(daily_spent) AS consumption
     FROM vk_ads
-    WHERE campaign_date BETWEEN '2023-06-01' AND '2023-07-01'
 )
 
 SELECT
