@@ -141,3 +141,53 @@ SELECT
 FROM revenue_data AS r
 INNER JOIN cost_data AS c ON r.source = c.source
 ORDER BY r.source;
+
+--расчет ключевых метрик
+WITH metrics_data AS (
+    SELECT
+        s.source,
+        COUNT(DISTINCT s.visitor_id) AS visitors_count,
+        COUNT(DISTINCT l.lead_id) AS leads_count,
+        COUNT(DISTINCT CASE WHEN l.status_id = 142 THEN l.lead_id END)
+            AS purchases_count,
+        COALESCE(SUM(CASE WHEN l.status_id = 142 THEN l.amount ELSE 0 END), 0)
+            AS revenue,
+        (
+            CASE
+                WHEN s.source = 'yandex'
+                    THEN (
+                        SELECT SUM(ya.daily_spent)
+                        FROM ya_ads AS ya
+                        WHERE
+                            ya.campaign_date BETWEEN '2023-06-01'
+                            AND '2023-07-01'
+                    )
+                WHEN s.source = 'vk' THEN (
+                    SELECT SUM(vk.daily_spent)
+                    FROM vk_ads AS vk
+                    WHERE vk.campaign_date BETWEEN '2023-06-01' AND '2023-07-01'
+                )
+            END
+        ) AS total_cost
+    FROM sessions AS s
+    LEFT JOIN leads AS l
+        ON s.visitor_id = l.visitor_id
+    WHERE
+        s.visit_date BETWEEN '2023-06-01' AND '2023-07-01'
+        AND s.source IN ('yandex', 'vk')
+    GROUP BY s.source
+)
+
+SELECT
+    source AS channel,
+    -- CPU (Cost Per Visitor)
+    ROUND(total_cost / NULLIF(visitors_count, 0), 2) AS cpu,
+    -- CPL (Cost Per Lead)
+    ROUND(total_cost / NULLIF(leads_count, 0), 2) AS cpl,
+    -- CPPU (Cost Per Purchasing User)
+    ROUND(total_cost / NULLIF(purchases_count, 0), 2) AS cppu,
+    -- ROI (Return On Investment)
+    ROUND((revenue - total_cost) * 100.0 / NULLIF(total_cost, 0), 2)
+        AS roi_percent
+FROM metrics_data
+ORDER BY source;
