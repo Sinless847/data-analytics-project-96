@@ -47,20 +47,13 @@ ORDER BY leads_count DESC;
 --количество посетителей с разбивкой источников перехода
 SELECT
     source,
-    CASE EXTRACT(ISODOW FROM visit_date)
-        WHEN 1 THEN '1monday'
-        WHEN 2 THEN '2tuesday'
-        WHEN 3 THEN '3wednesday'
-        WHEN 4 THEN '4thursday'
-        WHEN 5 THEN '5friday'
-        WHEN 6 THEN '6saturday'
-        WHEN 7 THEN '7sunday'
-    END AS day_of_week,
+    TO_CHAR(visit_date, 'day') AS day_of_week,
     COUNT(DISTINCT visitor_id) AS unique_visitors
 FROM sessions
 GROUP BY
     EXTRACT(ISODOW FROM visit_date),
-    source
+    source,
+    TO_CHAR(visit_date, 'day')
 ORDER BY
     EXTRACT(ISODOW FROM visit_date),
     unique_visitors DESC;
