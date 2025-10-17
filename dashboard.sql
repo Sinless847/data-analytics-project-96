@@ -8,6 +8,7 @@ FROM sessions
 WHERE visit_date BETWEEN '2023-06-01' AND '2023-07-01'
 GROUP BY DATE_TRUNC('day', visit_date)
 ORDER BY period;
+
 --источники трафика
 SELECT
     source,
@@ -34,6 +35,7 @@ WHERE
     AND s.source IN ('google', 'organic', 'vk', 'yandex')
 GROUP BY DATE(l.created_at), s.source
 ORDER BY period ASC, leads_count DESC;
+
 --лиды по источникам
 SELECT
     s.source,
@@ -45,6 +47,7 @@ WHERE
     AND s.source IN ('google', 'organic', 'vk', 'yandex')
 GROUP BY s.source
 ORDER BY leads_count DESC;
+
 --количество посетителей с разбивкой источников перехода
 SELECT
     source,
@@ -66,6 +69,7 @@ GROUP BY
 ORDER BY
     EXTRACT(ISODOW FROM visit_date),
     unique_visitors DESC;
+
 --затраты на вк и яндекс
 SELECT
     period,
@@ -91,6 +95,7 @@ FROM (
     GROUP BY campaign_date
 ) AS combined_data
 ORDER BY period, source;
+
 --окупаемость каналов
 WITH revenue_data AS (
     SELECT
@@ -135,6 +140,7 @@ SELECT
 FROM revenue_data AS r
 INNER JOIN cost_data AS c ON r.source = c.source
 ORDER BY r.source;
+
 --расчет ключевых метрик
 WITH ranked_clicks AS (
     SELECT
