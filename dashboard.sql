@@ -143,7 +143,8 @@ WITH ranked_clicks AS (
     FROM sessions AS s
     LEFT JOIN
         leads AS l
-        ON s.visitor_id = l.visitor_id AND s.visit_date <= l.created_at
+        ON s.visitor_id = l.visitor_id 
+        AND s.visit_date <= l.created_at
     WHERE s.medium != 'organic'
 ),
 
@@ -155,7 +156,9 @@ spendings AS (
         utm_campaign,
         SUM(daily_spent) AS total_cost
     FROM vk_ads
-    GROUP BY 1, 2, 3, 4
+    GROUP BY campaign_date,
+    utm_source, utm_medium,
+    utm_campaign
     UNION DISTINCT
     SELECT
         DATE(campaign_date) AS campaign_date,
@@ -164,7 +167,10 @@ spendings AS (
         utm_campaign,
         SUM(daily_spent) AS total_cost
     FROM ya_ads
-    GROUP BY 1, 2, 3, 4
+    GROUP BY campaign_date, 
+    utm_source,
+    utm_medium,
+    utm_campaign
 ),
 
 agg_tab AS (
@@ -181,9 +187,17 @@ agg_tab AS (
         SUM(amount) AS revenue
     FROM ranked_clicks
     WHERE rn = 1
-    GROUP BY 1, 2, 3, 4
+    GROUP BY utm_source,
+    utm_medium,
+    utm_campaign,
+    visit_date
     ORDER BY
-        8 DESC NULLS LAST, 4, 5 DESC, 1 ASC, 2 ASC, 3 ASC
+        revenue DESC NULLS LAST,
+        visit_date,
+        visitors_count DESC,
+        utm_source ASC,
+        utm_medium ASC,
+        utm_campaign ASC
 ),
 
 tabs AS (
@@ -204,7 +218,11 @@ tabs AS (
             AND agg_tab.utm_medium = sp.utm_medium
             AND agg_tab.utm_campaign = sp.utm_campaign
             AND agg_tab.visit_date = sp.campaign_date
-    ORDER BY 9 DESC NULLS LAST, 1, 5 DESC, 2, 3, 4
+    ORDER BY revenue DESC NULLS LAST,
+    visit_date,
+    visitors_count DESC,
+    utm_source, utm_medium,
+    utm_campaign
 )
 
 SELECT
@@ -225,4 +243,4 @@ SELECT
         100.0 * (SUM(revenue) - SUM(total_cost)) / SUM(total_cost), 2
     ) AS roi
 FROM tabs
-GROUP BY 1;
+GROUP BY utm_source;
